@@ -23,10 +23,10 @@ app.use(cors());
 app.use(express.json({ limit: '1mb', type: '*/*' })); // Accept all content types
 
 // Routes
-app.use('api/webhook', webhookRoutes(io));
+app.use('/api/webhook', webhookRoutes(io));
 
 // Health check
-app.get('api/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
@@ -37,7 +37,7 @@ setupSocket(io);
 server.listen(config.port, async () => {
   logger.info(`Server running on port ${config.port}`);
   logger.info(`Webhook: ${config.webhookUrl}`);
-  logger.info(`Health: http://localhost:${config.port}/health`);
+  logger.info(`Health: http://localhost:${config.port}/api/health`);
 
   // Auto-create hook if flag is passed
   // if (shouldCreateHook) {
