@@ -20,7 +20,7 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '1mb', type: '*/*' })); // Accept all content types
+app.use(express.raw({ limit: '1mb', type: '*/*' })); // Accept all content types
 
 // Routes
 app.use('/api/webhook', webhookRoutes(io));
