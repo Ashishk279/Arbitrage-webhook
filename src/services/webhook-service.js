@@ -7,46 +7,40 @@ export const handleWebhookPayload = (buffer, encoding, io) => {
       try {
         const eventData = JSON.parse(decompressed.toString('utf8'));
 
-        // DEBUG: Log first event's raw structure to understand field names
-        if (eventData.data && eventData.data.length > 0) {
-          console.log('\n========== RAW EVENT STRUCTURE ==========');
-          console.log(JSON.stringify(eventData.data[0], null, 2));
-          console.log('=========================================\n');
-        }
-
         // Log the batch info
         logger.info('New Arbitrage Batch', {
           eventsCount: eventData.data?.length || 0,
-          batchId: eventData.batchId || 'unknown'
+          timestamp: new Date(eventData.ts).toISOString()
         });
 
-        // Log each spread event
+        // Log each spread event with correct field names
         if (eventData.data && Array.isArray(eventData.data)) {
           eventData.data.forEach((event, index) => {
-            // Based on the example code structure: event.buy.exchange, event.sell.exchange
             logger.info(`Event ${index + 1}/${eventData.data.length}`, {
-              profitIndex: event.profitIndexMax?.toFixed(4),
-              profitPercent: event.profitIndexMax ? `${(event.profitIndexMax * 100).toFixed(2)}%` : 'N/A',
-              buyExchange: event.buy?.exchange || 'N/A',
-              buyNetwork: event.buy?.network || 'N/A',
-              sellExchange: event.sell?.exchange || 'N/A',
-              sellNetwork: event.sell?.network || 'N/A',
-              baseCurrency: event.baseCurrency || event.base?.currency || 'N/A',
-              quoteCurrency: event.quoteCurrency || event.quote?.currency || 'N/A',
-              timestamp: event.timestamp || event.createdAt || 'N/A'
+              symbol: event.symbol,
+              profitMax: `${(event.profitIndexMax * 100).toFixed(2)}%`,
+              profitAvg: `${(event.profitIndexAvg * 100).toFixed(2)}%`,
+              buyExchange: event.exchangeBuy,
+              sellExchange: event.exchangeSell,
+              buyPrice: `$${event.buyPriceAvg?.toFixed(6)}`,
+              sellPrice: `$${event.sellPriceAvg?.toFixed(6)}`,
+              volume: `$${event.volumeUsd?.toFixed(2)}`,
+              lifetime: `${(event.lifetime / 1000).toFixed(0)}s`
             });
           });
 
-          // Emit via WebSocket
-          io.emit('arbitrage-batch', eventData);
+          // Emit via WebSocket to all connected clients
+          io.emit('arbitrage-batch', {
+            data: eventData.data,
+            timestamp: eventData.ts,
+            count: eventData.data.length
+          });
         }
-
-        console.log("eventData", eventData);
 
         resolve({
           status: 'received',
           eventsCount: eventData.data?.length || 0,
-          batchId: eventData.batchId
+          timestamp: eventData.ts
         });
       } catch (err) {
         logger.error('JSON Parse Error', err);

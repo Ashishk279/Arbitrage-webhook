@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arbitrage Scanner - Live Opportunities</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: white;
+      padding: 25px;
+      border-radius: 15px;
+      margin-bottom: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      font-size: 32px;
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      opacity: 0.9;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    label {
+      font-weight: 600;
+      color: #555;
+    }
+
+    input, select {
+      padding: 8px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .connection-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.connected {
+      background: #10b981;
+    }
+
+    .status-dot.disconnected {
+      background: #ef4444;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .opportunities-container {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1200px;
+    }
+
+    thead {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    th {
+      padding: 15px 12px;
+      text-align: left;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    th:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #f0f0f0;
+      transition: background-color 0.2s;
+    }
+
+    tbody tr:hover {
+      background: #f8f9ff;
+    }
+
+    tbody tr.new-row {
+      animation: highlight 2s ease-in-out;
+    }
+
+    @keyframes highlight {
+      0% { background: #fef3c7; }
+      100% { background: transparent; }
+    }
+
+    td {
+      padding: 15px 12px;
+      font-size: 14px;
+    }
+
+    .profit-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .profit-high {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .profit-medium {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .profit-low {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .symbol {
+      font-weight: 700;
+      color: #667eea;
+      font-size: 15px;
+    }
+
+    .exchange-badge {
+      background: #f3f4f6;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      display: inline-block;
+      text-transform: uppercase;
+    }
+
+    .price {
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+    }
+
+    .arrow {
+      color: #667eea;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6b7280;
+      font-size: 16px;
+    }
+
+    .no-data-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      opacity: 0.3;
+    }
+
+    .lifetime {
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .volume {
+      font-weight: 600;
+      color: #059669;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 24px; }
+      .stats { grid-template-columns: 1fr 1fr; }
+      .controls { flex-direction: column; align-items: stretch; }
+      .connection-status { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🚀 Arbitrage Scanner - Live Opportunities</h1>
+      <p style="color: #6b7280; margin-top: 5px;">Real-time cryptocurrency arbitrage opportunities from multiple exchanges</p>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-value" id="totalOpportunities">0</div>
+          <div class="stat-label">Total Opportunities</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="avgProfit">0%</div>
+          <div class="stat-label">Average Profit</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="bestProfit">0%</div>
+          <div class="stat-label">Best Profit</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalVolume">$0</div>
+          <div class="stat-label">Total Volume</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="minProfit">Min Profit %:</label>
+        <input type="number" id="minProfit" value="0" step="0.1" min="0" style="width: 100px;">
+      </div>
+
+      <div class="control-group">
+        <label for="symbolFilter">Symbol:</label>
+        <input type="text" id="symbolFilter" placeholder="e.g. BTCUSDT" style="width: 150px;">
+      </div>
+
+      <div class="control-group">
+        <label for="sortBy">Sort by:</label>
+        <select id="sortBy">
+          <option value="profitIndexMax">Profit (High to Low)</option>
+          <option value="volumeUsd">Volume (High to Low)</option>
+          <option value="lifetime">Lifetime (Long to Short)</option>
+          <option value="symbol">Symbol (A-Z)</option>
+        </select>
+      </div>
+
+      <div class="connection-status">
+        <span class="status-dot disconnected" id="statusDot"></span>
+        <span id="connectionText">Connecting...</span>
+      </div>
+    </div>
+
+    <div class="opportunities-container">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortTable('symbol')">Symbol</th>
+            <th onclick="sortTable('profitIndexMax')">Max Profit</th>
+            <th onclick="sortTable('profitIndexAvg')">Avg Profit</th>
+            <th>Buy From</th>
+            <th>Buy Price</th>
+            <th class="arrow">→</th>
+            <th>Sell To</th>
+            <th>Sell Price</th>
+            <th onclick="sortTable('volumeUsd')">Volume (USD)</th>
+            <th onclick="sortTable('volume')">Volume (Coin)</th>
+            <th onclick="sortTable('lifetime')">Lifetime</th>
+          </tr>
+        </thead>
+        <tbody id="opportunitiesTable">
+          <tr>
+            <td colspan="11" class="no-data">
+              <div class="no-data-icon">📡</div>
+              <div>Waiting for arbitrage opportunities...</div>
+              <div style="margin-top: 10px; font-size: 14px;">Connect to the server to receive live data</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Socket.IO connection
+    const socket = io();
+
+    let opportunities = [];
+    let filters = {
+      minProfit: 0,
+      symbol: ''
+    };
+
+    // Connection status handlers
+    socket.on('connect', () => {
+      document.getElementById('statusDot').classList.remove('disconnected');
+      document.getElementById('statusDot').classList.add('connected');
+      document.getElementById('connectionText').textContent = 'Connected';
+      console.log('Connected to server');
+    });
+
+    socket.on('disconnect', () => {
+      document.getElementById('statusDot').classList.remove('connected');
+      document.getElementById('statusDot').classList.add('disconnected');
+      document.getElementById('connectionText').textContent = 'Disconnected';
+      console.log('Disconnected from server');
+    });
+
+    // Receive arbitrage batch data
+    socket.on('arbitrage-batch', (batch) => {
+      console.log('Received batch:', batch);
+
+      // Replace opportunities with new batch
+      opportunities = batch.data || [];
+
+      // Update stats
+      updateStats();
+
+      // Render table
+      renderTable();
+    });
+
+    // Filter event listeners
+    document.getElementById('minProfit').addEventListener('input', (e) => {
+      filters.minProfit = parseFloat(e.target.value) || 0;
+      renderTable();
+    });
+
+    document.getElementById('symbolFilter').addEventListener('input', (e) => {
+      filters.symbol = e.target.value.toUpperCase();
+      renderTable();
+    });
+
+    document.getElementById('sortBy').addEventListener('change', (e) => {
+      sortTable(e.target.value);
+    });
+
+    function updateStats() {
+      if (opportunities.length === 0) return;
+
+      // Total opportunities
+      document.getElementById('totalOpportunities').textContent = opportunities.length;
+
+      // Average profit
+      const avgProfit = opportunities.reduce((sum, opp) => sum + opp.profitIndexAvg, 0) / opportunities.length;
+      document.getElementById('avgProfit').textContent = (avgProfit * 100).toFixed(2) + '%';
+
+      // Best profit
+      const bestProfit = Math.max(...opportunities.map(opp => opp.profitIndexMax));
+      document.getElementById('bestProfit').textContent = (bestProfit * 100).toFixed(2) + '%';
+
+      // Total volume
+      const totalVolume = opportunities.reduce((sum, opp) => sum + (opp.volumeUsd || 0), 0);
+      document.getElementById('totalVolume').textContent = '$' + totalVolume.toFixed(2);
+    }
+
+    function filterOpportunities() {
+      return opportunities.filter(opp => {
+        // Filter by min profit
+        if (opp.profitIndexMax * 100 < filters.minProfit) return false;
+
+        // Filter by symbol
+        if (filters.symbol && !opp.symbol.includes(filters.symbol)) return false;
+
+        return true;
+      });
+    }
+
+    function sortTable(field) {
+      const filtered = filterOpportunities();
+
+      filtered.sort((a, b) => {
+        if (field === 'symbol') {
+          return a[field].localeCompare(b[field]);
+        }
+        return b[field] - a[field];
+      });
+
+      renderFilteredTable(filtered);
+    }
+
+    function renderTable() {
+      const filtered = filterOpportunities();
+
+      // Sort by default (profitIndexMax)
+      filtered.sort((a, b) => b.profitIndexMax - a.profitIndexMax);
+
+      renderFilteredTable(filtered);
+    }
+
+    function renderFilteredTable(filtered) {
+      const tbody = document.getElementById('opportunitiesTable');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="no-data">
+              <div class="no-data-icon">🔍</div>
+              <div>No opportunities match your filters</div>
+              <div style="margin-top: 10px; font-size: 14px;">Try adjusting the minimum profit or symbol filter</div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(opp => {
+        const profitPercent = (opp.profitIndexMax * 100).toFixed(2);
+        const profitAvgPercent = (opp.profitIndexAvg * 100).toFixed(2);
+        const profitClass = profitPercent >= 1 ? 'profit-high' : profitPercent >= 0.5 ? 'profit-medium' : 'profit-low';
+
+        return `
+          <tr class="new-row">
+            <td><span class="symbol">${opp.symbol}</span></td>
+            <td><span class="profit-badge ${profitClass}">${profitPercent}%</span></td>
+            <td>${profitAvgPercent}%</td>
+            <td><span class="exchange-badge">${opp.exchangeBuy}</span></td>
+            <td class="price">$${opp.buyPriceAvg.toFixed(6)}</td>
+            <td class="arrow">→</td>
+            <td><span class="exchange-badge">${opp.exchangeSell}</span></td>
+            <td class="price">$${opp.sellPriceAvg.toFixed(6)}</td>
+            <td class="volume">$${opp.volumeUsd.toFixed(2)}</td>
+            <td>${opp.volume.toFixed(2)}</td>
+            <td class="lifetime">${(opp.lifetime / 1000).toFixed(0)}s</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>

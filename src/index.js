@@ -2,10 +2,8 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import bodyParser from 'body-parser';
 import webhookRoutes from './routers/webhook-router.js';
 import { setupSocket } from './sockets/arbitrage-socket.js';
-import { createSpotSpreadHook } from './services/arbitrage-service.js';
 import { config } from './config/config.js';
 import { logger } from './utils/logger.js';
 
@@ -21,8 +19,11 @@ const io = new Server(server, {
 // Middleware
 app.use(cors());
 
+// Serve static files from public directory (for frontend)
+app.use(express.static('public'));
+
 // Use raw body parser for webhook routes to receive binary/gzipped data
-app.use( express.raw({
+app.use('/api/webhook', express.raw({
   type: 'application/json',
   limit: '10mb'
 }));
@@ -45,6 +46,7 @@ setupSocket(io);
 server.listen(config.port, async () => {
   logger.info(`Server running on port ${config.port}`);
   logger.info(`Webhook: ${config.webhookUrl}`);
+  logger.info(`Frontend: https://arbitrage-webhook.onrender.com`);
   logger.info(`Health: https://arbitrage-webhook.onrender.com/api/health`);
 
   // Auto-create hook if flag is passed
