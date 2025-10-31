@@ -22,8 +22,8 @@ const io = new Server(server, {
 app.use(cors());
 
 // Use raw body parser for webhook routes to receive binary/gzipped data
-app.use('/api/webhook', express.raw({
-  type: '*/*',
+app.use( express.raw({
+  type: 'application/json',
   limit: '10mb'
 }));
 
