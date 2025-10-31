@@ -7,6 +7,13 @@ export const handleWebhookPayload = (buffer, encoding, io) => {
       try {
         const eventData = JSON.parse(decompressed.toString('utf8'));
 
+        // DEBUG: Log first event's raw structure to understand field names
+        if (eventData.data && eventData.data.length > 0) {
+          console.log('\n========== RAW EVENT STRUCTURE ==========');
+          console.log(JSON.stringify(eventData.data[0], null, 2));
+          console.log('=========================================\n');
+        }
+
         // Log the batch info
         logger.info('New Arbitrage Batch', {
           eventsCount: eventData.data?.length || 0,
@@ -16,21 +23,25 @@ export const handleWebhookPayload = (buffer, encoding, io) => {
         // Log each spread event
         if (eventData.data && Array.isArray(eventData.data)) {
           eventData.data.forEach((event, index) => {
+            // Based on the example code structure: event.buy.exchange, event.sell.exchange
             logger.info(`Event ${index + 1}/${eventData.data.length}`, {
-              profit: `${event.profitPercent?.toFixed(2)}%`,
               profitIndex: event.profitIndexMax?.toFixed(4),
-              amount: event.dealAmountUsd ? `$${event.dealAmountUsd}` : 'N/A',
-              buy: `${event.buyExchange} (${event.buyNetwork})`,
-              sell: `${event.sellExchange} (${event.sellNetwork})`,
-              pair: `${event.baseCurrency}/${event.quoteCurrency}`,
-              lifetime: `${event.lifetimeMs}ms`,
-              timestamp: event.timestamp ? new Date(event.timestamp).toISOString() : 'N/A'
+              profitPercent: event.profitIndexMax ? `${(event.profitIndexMax * 100).toFixed(2)}%` : 'N/A',
+              buyExchange: event.buy?.exchange || 'N/A',
+              buyNetwork: event.buy?.network || 'N/A',
+              sellExchange: event.sell?.exchange || 'N/A',
+              sellNetwork: event.sell?.network || 'N/A',
+              baseCurrency: event.baseCurrency || event.base?.currency || 'N/A',
+              quoteCurrency: event.quoteCurrency || event.quote?.currency || 'N/A',
+              timestamp: event.timestamp || event.createdAt || 'N/A'
             });
           });
 
           // Emit via WebSocket
           io.emit('arbitrage-batch', eventData);
         }
+
+        console.log("eventData", eventData);
 
         resolve({
           status: 'received',
