@@ -7,11 +7,6 @@ export default (io) => {
   router.post('/spot-hook', async (req, res) => {
     const encoding = req.headers['content-encoding'];
     const buffer = req.body;
-
-    console.log('Received Webhook:', {
-      encoding,
-      length: buffer.length,
-    });
     console.log('Headers:', req.headers);   
     console.log('Raw Body:', buffer);
 
