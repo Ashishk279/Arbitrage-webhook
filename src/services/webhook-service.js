@@ -7,29 +7,47 @@ export const handleWebhookPayload = (buffer, encoding, io) => {
       try {
         const eventData = JSON.parse(decompressed.toString('utf8'));
 
-        // Console log structured data
-        logger.info('New Arbitrage Event', {
-          eventType: eventData.event_type || 'spot_spread',
-          profit: `${eventData.profit_percent}%`,
-          amount: `$${eventData.deal_amount_usd}`,
-          buy: `${eventData.buy_exchange} (${eventData.buy_network})`,
-          sell: `${eventData.sell_exchange} (${eventData.sell_network})`,
-          pair: `${eventData.base_currency}/${eventData.quote_currency}`,
-          lifetime: `${eventData.lifetime_ms}ms`,
-          timestamp: new Date(eventData.timestamp).toISOString(),
+        // Log the batch info
+        logger.info('New Arbitrage Batch', {
+          eventsCount: eventData.data?.length || 0,
+          batchId: eventData.batchId || 'unknown'
         });
 
-        // Emit via WebSocket
-        io.emit('arbitrage-event', eventData);
+        // Log each spread event
+        if (eventData.data && Array.isArray(eventData.data)) {
+          eventData.data.forEach((event, index) => {
+            logger.info(`Event ${index + 1}/${eventData.data.length}`, {
+              profit: `${event.profitPercent?.toFixed(2)}%`,
+              profitIndex: event.profitIndexMax?.toFixed(4),
+              amount: event.dealAmountUsd ? `$${event.dealAmountUsd}` : 'N/A',
+              buy: `${event.buyExchange} (${event.buyNetwork})`,
+              sell: `${event.sellExchange} (${event.sellNetwork})`,
+              pair: `${event.baseCurrency}/${event.quoteCurrency}`,
+              lifetime: `${event.lifetimeMs}ms`,
+              timestamp: event.timestamp ? new Date(event.timestamp).toISOString() : 'N/A'
+            });
+          });
 
-        resolve({ status: 'received', eventId: eventData.id || 'unknown' });
+          // Emit via WebSocket
+          io.emit('arbitrage-batch', eventData);
+        }
+
+        resolve({
+          status: 'received',
+          eventsCount: eventData.data?.length || 0,
+          batchId: eventData.batchId
+        });
       } catch (err) {
         logger.error('JSON Parse Error', err);
         reject(new Error('Invalid JSON'));
       }
     };
 
-    if (encoding === 'gzip') {
+    // Check if buffer is actually gzipped by checking magic bytes (1f 8b)
+    const isGzipped = buffer && buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b;
+
+    if (isGzipped) {
+      logger.info('Data is gzipped - decompressing...');
       zlib.gunzip(buffer, (err, decompressed) => {
         if (err) {
           logger.error('Gzip Decompression Failed', err);
@@ -38,6 +56,8 @@ export const handleWebhookPayload = (buffer, encoding, io) => {
         process(decompressed);
       });
     } else {
+      logger.info('Data is NOT gzipped - treating as plain JSON');
+      // Data is already decompressed (by Cloudflare/Express middleware)
       process(buffer);
     }
   });

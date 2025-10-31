@@ -20,7 +20,15 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors());
-app.use(express.raw({ limit: '1mb', type: '*/*' })); // Accept all content types
+
+// Use raw body parser for webhook routes to receive binary/gzipped data
+app.use('/api/webhook', express.raw({
+  type: '*/*',
+  limit: '10mb'
+}));
+
+// Use JSON parser for other routes
+app.use(express.json({ limit: '1mb' }));
 
 // Routes
 app.use('/api/webhook', webhookRoutes(io));
