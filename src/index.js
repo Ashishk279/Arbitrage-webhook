@@ -37,7 +37,7 @@ setupSocket(io);
 server.listen(config.port, async () => {
   logger.info(`Server running on port ${config.port}`);
   logger.info(`Webhook: ${config.webhookUrl}`);
-  logger.info(`Health: http://localhost:${config.port}/api/health`);
+  logger.info(`Health: https://arbitrage-webhook.onrender.com/api/health`);
 
   // Auto-create hook if flag is passed
   // if (shouldCreateHook) {
